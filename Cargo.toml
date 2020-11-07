@@ -1,0 +1,14 @@
+[package]
+name = "Auger"
+version = "0.1.0"
+authors = ["WeAreAngus <52379007+hackermanangus@users.noreply.github.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+twilight-cache-inmemory = "0.2"
+twilight-gateway = "0.2"
+twilight-http = "0.2"
+twilight-model = "0.2"
+

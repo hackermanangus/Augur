@@ -7,7 +7,7 @@ use twilight_model::id::{GuildId, ChannelId};
 // Order of operation is as following
 // First we create a new RoyalNovel struct with RoyalNovel::new(novel_link, pool)
 // This should automatically check for an existing novel with the same link, and retrieve it's uuid
-// TODO: It should only retrieve chapters if a new uuid is generated, otherwise blank, add a field that counts for existence
+// It should only retrieve chapters if a new uuid is generated, otherwise blank, add a field that counts for existence
 
 // RoyalGuid::new() takes a RoyalNovel struct, this RoyalNovel struct has to follow the order of operation above
 // Otherwise the database will mess up
@@ -41,6 +41,17 @@ impl RoyalGuild {
             Err(e) => Err(SimpleError::new(e))
         }
     }
+    pub async fn remove(&self, pool: &SqlitePool) -> Result<(), SimpleError> {
+        let mut conn = pool.acquire().await.unwrap();
+        let result = sqlx::query("DELETE FROM Guilds WHERE novel_id = ? AND channel_id=?")
+            .bind(&self.novel_id)
+            .bind(&self.channel_id)
+            .execute(&mut conn).await;
+        return match result {
+            Ok(_) => { Ok(())},
+            Err(e) => Err(SimpleError::new("Failed to remove novel. Please try again".to_string()))
+        }
+    }
 }
 pub struct RoyalNovel {
     pub novel_id: String,
@@ -50,6 +61,18 @@ pub struct RoyalNovel {
 }
 
 impl RoyalNovel {
+    pub async fn proc_new(novel_link: String, pool: &SqlitePool) -> Result<RoyalNovel, SimpleError> {
+        let (novel_id, precedent) = Self::check(&novel_link, pool).await;
+        if !precedent {
+            return Err(SimpleError::new("Novel doesn't exist in database".to_string()))
+        }
+        Ok(RoyalNovel {
+            novel_id,
+            novel_link,
+            chapter_id: "".to_string(),
+            precedent
+        })
+    }
     pub async fn new(novel_link: String, pool: &SqlitePool) -> Result<RoyalNovel, SimpleError> {
         let (novel_id, precedent) = Self::check(&novel_link, pool).await;
         let chapter_id: String;

@@ -6,6 +6,8 @@ use twilight_model::gateway::payload::MessageCreate;
 
 use crate::Bot;
 
+mod royalroadupdate;
+
 pub async fn handle(msg: Box<MessageCreate>, bot: Arc<Bot>, args: Vec<&str>) -> Result<(), Box<dyn Error + Send + Sync>> {
     match args[1] {
         "add" => {

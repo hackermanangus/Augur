@@ -2,26 +2,30 @@ use std::env;
 
 use sqlx::{
     Error as SqlError,
-    prelude::*,
     sqlite::SqlitePool,
 };
 
-pub async fn database_connect() -> Result<SqlitePool, SqlError> {
+pub async fn connect_database() -> Result<SqlitePool, SqlError> {
     let path = env::var("DATABASE_URL").expect("No DATABASE_URL found");
-    SqlitePool::new(&*path).await
+    SqlitePool::connect(&path).await
 }
 
-pub async fn init_db<C: Executor>(db: &mut C) -> Result<(), SqlError> {
-    db.execute("
-    CREATE TABLE IF NOT EXISTS Guilds(
-        guild_id STRING NOT NULL,
-        channel_id STRING NOT NULL,
-        novel_id STRING NOT NULL
-    )").await?;
-    db.execute("
+pub async fn setup_database(pool: &SqlitePool) -> Result<(), SqlError> {
+    sqlx::query("
         CREATE TABLE IF NOT EXISTS Novels(
-        novel_id STRING NOT NULL,
-        chapter_id STRING NOT NULL
-    )").await?;
+        novel_id TEXT NOT NULL,
+        novel_link TEXT NOT NULL,
+        chapter_id TEXT NOT NULL,
+        PRIMARY KEY (novel_id)
+    )").execute(pool).await?;
+    sqlx::query("
+        CREATE TABLE IF NOT EXISTS Guilds(
+        guild_id TEXT NOT NULL,
+        channel_id TEXT NOT NULL,
+        novel_id TEXT NOT NULL,
+        FOREIGN KEY (novel_id) REFERENCES Novels (novel_id),
+        PRIMARY KEY(channel_id)
+    )").execute(pool).await?;
+
     Ok(())
 }

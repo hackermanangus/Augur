@@ -1,6 +1,7 @@
 mod db;
 mod command;
 mod royalroad;
+mod error;
 
 use std::{env, error::Error};
 use tokio::stream::StreamExt;
@@ -8,8 +9,8 @@ use twilight_cache_inmemory::{EventType, InMemoryCache};
 use twilight_gateway::{cluster::{Cluster, ShardScheme}, Event};
 use twilight_http::Client as HttpClient;
 use twilight_model::gateway::Intents;
-use sqlx::SqlitePool;
 use std::sync::Arc;
+use sqlx::SqlitePool;
 
 pub struct Bot {
     pub http: HttpClient,
@@ -41,12 +42,24 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     // HTTP is separate from the gateway, so create a new client.
     let http = HttpClient::new(&token);
-    let pool = db::database_connect().await.expect("Unable to connect to database");
-    db::init_db(&mut pool.acquire().await.unwrap()).await.expect("Unable to initialise database");
+    let mut pool = db::connect_database().await.expect("Unable to connect to database");
+    db::setup_database(&mut pool).await.unwrap();
     let bot = Arc::new(Bot {
         http,
         pool
     });
+
+    // yes
+
+    // let novel = RoyalNovel {
+    //     novel_id: "test".to_string(),
+    //     novel_link: "fuck".to_string(),
+    //     chapter_id: "tes".to_string(),
+    //     precedent: false
+    // };
+
+    //novel.insert(&bot.pool).await?;
+    //println!("{}", novel.check(&bot.pool).await.unwrap().to_string());
 
     // Since we only care about new messages, make the cache only
     // cache new messages.
@@ -65,6 +78,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 
         tokio::spawn(handle_event(shard_id, event, bot.clone()));
     }
+
 
     Ok(())
 }

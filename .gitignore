@@ -2,6 +2,6 @@
 /.idea/
 Cargo.lock
 /.env
-novels.db
-novels.db-shm
-novels.db-wal
+/augur.db
+/augur.db-shm
+/augur.db-wal

@@ -5,7 +5,6 @@ use twilight_model::gateway::payload::MessageCreate;
 
 use crate::Bot;
 use crate::royalroad::royalstruct::{RoyalNovel, RoyalGuild};
-use crate::error::SimpleError;
 
 
 pub async fn handle(msg: Box<MessageCreate>, bot: Arc<Bot>, args: Vec<&str>) -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -51,7 +50,20 @@ pub async fn handle(msg: Box<MessageCreate>, bot: Arc<Bot>, args: Vec<&str>) -> 
             }
         },
         "check" => {
-            todo!("This is not important, leave it for last")
+            let result = RoyalGuild::check(msg.guild_id, &bot.pool).await;
+            let contain = match result {
+                Ok(contain) => contain,
+                Err(e) => {
+                    &bot.http.create_message(msg.channel_id).content(e.to_string())?.await?;
+                    return Ok(())
+                }
+            };
+            let mut temp: String = "".to_string();
+            contain.into_iter().map(|(x, y)| {
+                temp.push_str(&format!("{} currently houses <{}>\n", x, y));
+            }).for_each(drop);
+            &bot.http.create_message(msg.channel_id).content(temp)?.await?;
+            return Ok(())
         },
         _ => {}
     }

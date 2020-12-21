@@ -24,7 +24,7 @@ pub async fn setup_database(pool: &SqlitePool) -> Result<(), SqlError> {
         channel_id TEXT NOT NULL,
         novel_id TEXT NOT NULL,
         FOREIGN KEY (novel_id) REFERENCES Novels (novel_id),
-        PRIMARY KEY(channel_id)
+        UNIQUE(channel_id, novel_id)
     )").execute(pool).await?;
 
     Ok(())

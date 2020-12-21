@@ -49,8 +49,34 @@ impl RoyalGuild {
             .execute(&mut conn).await;
         return match result {
             Ok(_) => { Ok(())},
-            Err(e) => Err(SimpleError::new("Failed to remove novel. Please try again".to_string()))
+            Err(_) => Err(SimpleError::new("Failed to remove novel. Please try again".to_string()))
         }
+    }
+    pub async fn check(guild_id: Option<GuildId>, pool: &SqlitePool) -> Result<Vec<(String, String)>, SimpleError> {
+        let mut conn = pool.acquire().await.unwrap();
+        let guild = guild_id.unwrap().to_string();
+        let result = sqlx::query(
+            "SELECT DISTINCT novel_link, channel_id FROM Novels, Guilds WHERE guild_id=?")
+            .bind(guild)
+            .fetch_all(&mut conn)
+            .await;
+        return match result {
+            Ok(this) => {
+                if this.is_empty() {return Err(SimpleError::new("This guild hasn't set up any novels".to_string()))}
+                let mut temp: Vec<(String, String)> = Vec::new();
+                this.into_iter().map(|x| {
+                    let y: String = x.get("novel_link");
+                    let z: String = x.get("channel_id");
+                    temp.push((z, y));
+                }
+                ).for_each(drop);
+                Ok(temp)
+            },
+            Err(e) => {
+                Err(SimpleError::new(e.to_string()))
+            }
+        }
+
     }
 }
 pub struct RoyalNovel {

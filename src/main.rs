@@ -11,6 +11,8 @@ use twilight_http::Client as HttpClient;
 use twilight_model::gateway::Intents;
 use std::sync::Arc;
 use sqlx::SqlitePool;
+use tokio::time::Duration;
+use crate::royalroad::royalstruct::{RoyalNovel, RoyalMessage};
 
 pub struct Bot {
     pub http: HttpClient,
@@ -70,13 +72,89 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         .build();
 
     let mut events = cluster.events();
+    let other_bot = bot.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::time::delay_for(Duration::from_secs(600)).await;
+            println!("launching");
+            let novels = match RoyalNovel::retrieve_old(&bot.pool).await {
+                Ok(t) => t,
+                Err(e) => {
+                    println!("{}", e.to_string());
+                    break
+                }
+            };
+            for novel in novels.into_iter() {
+                let chapter_id = match RoyalNovel::get_chapters(&novel.novel_link.clone()).await {
+                    Ok(t) => t,
+                    Err(e) => {
+                        println!("{}", e.to_string());
+                        "".to_string()
+                    }
+                };
+                let new_novel = RoyalNovel {
+                    novel_id: novel.novel_id.clone(),
+                    novel_link: novel.novel_link.clone(),
+                    chapter_id,
+                    precedent: true
+                };
+                let _ = new_novel.update(&bot.pool).await;
+                let message = novel.compare(&new_novel);
+                let channels = RoyalMessage::retrieve_channel_groups(novel.novel_id.clone(), &bot.pool).await;
+                if channels.is_none() {
+                    break
+                } else {
+                    let vec_channel = channels.unwrap();
 
+                    println!("->{:?}", &vec_channel );
+                    for channel in vec_channel.into_iter() {
+                        message.chapter_id.as_slice().chunks(5);
+                        for slice in message.chapter_id.chunks(5) {
+                            let compounded_msg = slice.iter().map(|x| {
+                                //println!("{}", &x);
+                                format!("https://royalroad.com{}\n",x)
+
+                            }).collect::<String>();
+                            &bot.http.create_message(channel).content(&compounded_msg).unwrap().await;
+                        }
+                    }
+                }
+
+            }
+
+
+        //     let new_novel = novels.into_iter().map(|novel| {
+        //         let new_novel = RoyalNovel {
+        //             novel_id: novel.novel_id.clone(),
+        //             novel_link: novel.novel_link.clone(),
+        //             chapter_id,
+        //             precedent: true
+        //         };
+        //         messages.push(novel.compare(&new_novel));
+        //         new_novel
+        //     }).collect::<Vec<RoyalNovel>>();
+        //     for n in new_novel.into_iter() { n.update(&bot.pool).await};
+        //     messages.into_iter().map(|mut message| {
+        //         message.set_channel_id(RoyalMessage::retrieve_channel_groups(message.novel_id.clone(), &bot.pool).await);
+        //         if message.channel_id.is_some() {
+        //             let mut links = String::new();
+        //             message.chapter_id.into_iter().map(|link| {
+        //                 links.push_str(format!("https://royalroad.com{} \n", link).as_str());
+        //             });
+        //             message.channel_id.unwrap().into_iter().map(|channel| {
+        //                 &bot.http.create_message(channel).content(links)?.await?;
+        //                 tokio::time::delay_for(Duration::from_secs(1)).await;
+        //             }).collect::<Option<T>>();
+        //         }
+        //     });
+        }
+    });
     // Process each event as they come in.
     while let Some((shard_id, event)) = events.next().await {
         // Update the cache with the event.
         cache.update(&event);
 
-        tokio::spawn(handle_event(shard_id, event, bot.clone()));
+        tokio::spawn(handle_event(shard_id, event, other_bot.clone()));
     }
 
 

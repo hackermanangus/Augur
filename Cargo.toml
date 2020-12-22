@@ -1,5 +1,5 @@
 [package]
-name = "augur"
+name = "Auger"
 version = "0.1.0"
 authors = ["WeAreAngus <52379007+hackermanangus@users.noreply.github.com>"]
 edition = "2018"

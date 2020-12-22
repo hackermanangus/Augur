@@ -3,7 +3,6 @@ use crate::error::SimpleError;
 use uuid::Uuid;
 use regex::Regex;
 use twilight_model::id::{GuildId, ChannelId};
-
 // Order of operation is as following
 // First we create a new RoyalNovel struct with RoyalNovel::new(novel_link, pool)
 // This should automatically check for an existing novel with the same link, and retrieve it's uuid
@@ -126,7 +125,7 @@ impl RoyalNovel {
         }
         Ok(RoyalGuild::new(guild, channel, self))
     }
-    async fn get_chapters(novel_link: &String) -> Result<String, SimpleError> {
+    pub async fn get_chapters(novel_link: &String) -> Result<String, SimpleError> {
         let page = reqwest::get(novel_link).await;
         let page = match page {
             Ok(body) => match body.text().await {
@@ -142,18 +141,14 @@ impl RoyalNovel {
         // /chapter/(?P<chapter_id>[0-9])/ another regex I wrote to get the id
         // <td>\s*<a\s*href=["'](?P<chapter_link>[^"']+)["']> this works, something with the old regex broke?
         let re = Regex::new(r#"(?sm)<td>\s*<a\s*href=["'](?P<chapter_link>[^"']+)["']>"#).unwrap();
-        let re_c_id = Regex::new(r#"/chapter/(?P<chapter_id>[0-9]*)/"#).unwrap();
-        let mut truth: bool = true;
+        //let re_c_id = Regex::new(r#"/chapter/(?P<chapter_id>[0-9]*)/"#).unwrap();
+        let truth: bool = true;
         let mut temp: String = String::new();
         for capture in re.captures_iter(&page)
         {
-            let one = re_c_id.captures(&capture["chapter_link"]);
-            if let Some(r) = one {
-                temp.push_str(&r["chapter_id"]);
-                temp.push_str(" ");
-            } else {
-                truth = false;
-            }
+            //let one = re_c_id.captures(&capture["chapter_link"]);
+            temp.push_str(&capture["chapter_link"]);
+            temp.push_str(" ");
         }
         return if truth {
             Ok(temp.trim().to_string())
@@ -190,7 +185,7 @@ impl RoyalNovel {
         }
         Ok(())
     }
-    pub fn compare(&self, updated: &RoyalNovel) -> Vec<String> {
+    pub fn compare(&self, updated: &RoyalNovel) -> RoyalMessage {
         let one = self.chapter_id.split_whitespace().collect::<Vec<&str>>().into_iter().map(|x| x.to_string()).collect::<Vec<String>>();
         let two = updated.chapter_id.split_whitespace().collect::<Vec<&str>>().into_iter().map(|x| x.to_string()).collect::<Vec<String>>();
 
@@ -202,6 +197,81 @@ impl RoyalNovel {
             } else {
                 None
             }).collect::<Vec<String>>();
-        return three
+
+        return RoyalMessage::new(self.novel_id.clone(), self.novel_link.clone(), three )
+    }
+    pub async fn retrieve_old(pool: &SqlitePool) -> Result<Vec<RoyalNovel>, SimpleError> {
+        let result = sqlx::query("\
+        SELECT novel_id, novel_link, chapter_id FROM Novels").fetch_all(pool).await;
+
+        return match result {
+            Ok(k) => {
+                let mut temp: Vec<RoyalNovel> = Vec::new();
+                k.into_iter().map(|x| {
+                    let novel_id :&str= x.get("novel_id");
+                    let novel_link :&str= x.get("novel_link");
+                    let chapter_id:&str = x.get("chapter_id");
+                    let precedent = true;
+                    let novel = RoyalNovel {
+                        novel_id: novel_id.to_string(),
+                        novel_link: novel_link.to_string(),
+                        chapter_id: chapter_id.to_string(),
+                        precedent
+                    };
+                    temp.push(novel);
+                }).for_each(drop);
+                return Ok(temp);
+            },
+            Err(e) => Err(SimpleError::new(e.to_string()))
+        }
+    }
+    pub async fn update(&self, pool: &SqlitePool) -> Result<(), SimpleError> {
+        let result = sqlx::query("\
+        UPDATE Novels SET chapter_id = ? WHERE novel_id = ?").bind(&self.chapter_id).bind(&self.novel_id)
+            .execute(pool).await;
+        return match result {
+            Ok(_) => Ok(()),
+            Err(e) => Err(SimpleError::new(e.to_string()))
+        }
     }
 }
+
+pub struct RoyalMessage {
+    pub novel_id: String,
+    pub novel_link: String,
+    pub chapter_id: Vec<String>,
+    pub channel_id: Option<Vec<ChannelId>>
+}
+
+impl RoyalMessage {
+    pub fn new(novel_id: String, novel_link: String, chapter_id: Vec<String>) -> RoyalMessage {
+        RoyalMessage {
+            novel_id,
+            novel_link,
+            chapter_id,
+            channel_id: None
+        }
+    }
+    // pub fn set_channel_id(&mut self, channel_id: Option<Vec<ChannelId>>) {
+    //     self.channel_id = channel_id;
+    // }
+    pub async fn retrieve_channel_groups(novel_id: String, pool: &SqlitePool) -> Option<Vec<ChannelId>> {
+        let result = sqlx::query("\
+        SELECT channel_id FROM Guilds WHERE novel_id = ?")
+            .bind(novel_id)
+            .fetch_all(pool).await;
+        return match result {
+            Ok(t) => {
+
+                let z = t.into_iter().map(|x| {
+                    let channel_id: &str = x.get("channel_id");
+                    ChannelId::from(channel_id.parse::<u64>().unwrap())
+                }).collect::<Vec<ChannelId>>();
+                Some(z)
+            },
+            Err(_) => None
+        }
+    }
+}
+
+

@@ -14,6 +14,9 @@ Simple [invite Augur](https://discord.com/oauth2/authorize?client_id=69857787032
 >royalroad remove <link> # Link is a required argument
 ```
 
+Pick a channel to setup a feed in and run `>royalroad add <link>`. Remove a feed with `>royalroad remove <link>`.
+Alternavitely `>royalroad check` can be used to check all active feeds in a guild.
+
 ## Contributing
 Feel free to make a pull request
 

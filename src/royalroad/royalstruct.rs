@@ -1,8 +1,10 @@
-use sqlx::{SqlitePool, Row};
-use crate::error::SimpleError;
-use uuid::Uuid;
 use regex::Regex;
-use twilight_model::id::{GuildId, ChannelId};
+use sqlx::{Row, SqlitePool};
+use twilight_model::id::{ChannelId, GuildId};
+use uuid::Uuid;
+
+use crate::error::SimpleError;
+
 // Order of operation is as following
 // First we create a new RoyalNovel struct with RoyalNovel::new(novel_link, pool)
 // This should automatically check for an existing novel with the same link, and retrieve it's uuid
@@ -14,7 +16,7 @@ use twilight_model::id::{GuildId, ChannelId};
 pub struct RoyalGuild {
     pub guild_id: String,
     pub channel_id: String,
-    pub novel_id: String
+    pub novel_id: String,
 }
 
 impl RoyalGuild {
@@ -24,7 +26,7 @@ impl RoyalGuild {
         RoyalGuild {
             guild_id,
             channel_id,
-            novel_id: royal_novel.novel_id.clone()
+            novel_id: royal_novel.novel_id.clone(),
         }
     }
     pub async fn insert(&self, pool: &SqlitePool) -> Result<(), SimpleError> {
@@ -38,7 +40,7 @@ impl RoyalGuild {
         return match result {
             Ok(_) => Ok(()),
             Err(e) => Err(SimpleError::new(e))
-        }
+        };
     }
     pub async fn remove(&self, pool: &SqlitePool) -> Result<(), SimpleError> {
         let mut conn = pool.acquire().await.unwrap();
@@ -47,9 +49,9 @@ impl RoyalGuild {
             .bind(&self.channel_id)
             .execute(&mut conn).await;
         return match result {
-            Ok(_) => { Ok(())},
+            Ok(_) => { Ok(()) }
             Err(_) => Err(SimpleError::new("Failed to remove novel. Please try again".to_string()))
-        }
+        };
     }
     pub async fn check(guild_id: Option<GuildId>, pool: &SqlitePool) -> Result<Vec<(String, String)>, SimpleError> {
         let mut conn = pool.acquire().await.unwrap();
@@ -61,7 +63,7 @@ impl RoyalGuild {
             .await;
         return match result {
             Ok(this) => {
-                if this.is_empty() {return Err(SimpleError::new("This guild hasn't set up any novels".to_string()))}
+                if this.is_empty() { return Err(SimpleError::new("This guild hasn't set up any novels".to_string())); }
                 let mut temp: Vec<(String, String)> = Vec::new();
                 this.into_iter().map(|x| {
                     let y: String = x.get("novel_link");
@@ -70,32 +72,32 @@ impl RoyalGuild {
                 }
                 ).for_each(drop);
                 Ok(temp)
-            },
+            }
             Err(e) => {
                 Err(SimpleError::new(e.to_string()))
             }
-        }
-
+        };
     }
 }
+
 pub struct RoyalNovel {
     pub novel_id: String,
     pub novel_link: String,
     pub chapter_id: String,
-    pub precedent: bool
+    pub precedent: bool,
 }
 
 impl RoyalNovel {
     pub async fn proc_new(novel_link: String, pool: &SqlitePool) -> Result<RoyalNovel, SimpleError> {
         let (novel_id, precedent) = Self::check(&novel_link, pool).await;
         if !precedent {
-            return Err(SimpleError::new("Novel doesn't exist in database".to_string()))
+            return Err(SimpleError::new("Novel doesn't exist in database".to_string()));
         }
         Ok(RoyalNovel {
             novel_id,
             novel_link,
             chapter_id: "".to_string(),
-            precedent
+            precedent,
         })
     }
     pub async fn new(novel_link: String, pool: &SqlitePool) -> Result<RoyalNovel, SimpleError> {
@@ -105,7 +107,7 @@ impl RoyalNovel {
             chapter_id = "".to_string();
         } else {
             match Self::get_chapters(&novel_link).await {
-                Ok(t) => {chapter_id = t},
+                Ok(t) => { chapter_id = t }
                 Err(e) => return Err(e)
             }
         };
@@ -113,13 +115,13 @@ impl RoyalNovel {
             novel_id,
             novel_link,
             chapter_id,
-            precedent
+            precedent,
         })
     }
     pub async fn process(&self, pool: &SqlitePool, guild: Option<GuildId>, channel: ChannelId) -> Result<RoyalGuild, SimpleError> {
         if !self.precedent {
             match self.insert(pool).await {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => return Err(e)
             }
         }
@@ -129,8 +131,8 @@ impl RoyalNovel {
         let page = reqwest::get(novel_link).await;
         let page = match page {
             Ok(body) => match body.text().await {
-                Ok(text) => {text}
-                Err(e) => {return Err(SimpleError::new(e.to_string()))}
+                Ok(text) => { text }
+                Err(e) => { return Err(SimpleError::new(e.to_string())); }
             },
             Err(_) => {
                 return Err(SimpleError::new("Invalid novel link"));
@@ -154,7 +156,7 @@ impl RoyalNovel {
             Ok(temp.trim().to_string())
         } else {
             Err(SimpleError::new("No chapters found".to_string()))
-        }
+        };
     }
     pub async fn check(novel_link: &String, pool: &SqlitePool) -> (String, bool) {
         let row = sqlx::query("SELECT * FROM Novels WHERE novel_link = ?")
@@ -164,9 +166,9 @@ impl RoyalNovel {
             Ok(row) => {
                 let novel_id: &str = row.get("novel_id");
                 (novel_id.to_string(), true)
-            },
-            _ => {(Uuid::new_v4().to_string(), false)}
-        }
+            }
+            _ => { (Uuid::new_v4().to_string(), false) }
+        };
 
     }
     async fn insert(&self, pool: &SqlitePool) -> Result<(), SimpleError> {
@@ -181,7 +183,7 @@ impl RoyalNovel {
             return match result {
                 Ok(_) => Ok(()),
                 Err(e) => Err(SimpleError::new(e))
-            }
+            };
         }
         Ok(())
     }
@@ -198,7 +200,7 @@ impl RoyalNovel {
                 None
             }).collect::<Vec<String>>();
 
-        return RoyalMessage::new(self.novel_id.clone(), self.novel_link.clone(), three )
+        return RoyalMessage::new(self.novel_id.clone(), self.novel_link.clone(), three);
     }
     pub async fn retrieve_old(pool: &SqlitePool) -> Result<Vec<RoyalNovel>, SimpleError> {
         let result = sqlx::query("\
@@ -208,22 +210,22 @@ impl RoyalNovel {
             Ok(k) => {
                 let mut temp: Vec<RoyalNovel> = Vec::new();
                 k.into_iter().map(|x| {
-                    let novel_id :&str= x.get("novel_id");
-                    let novel_link :&str= x.get("novel_link");
-                    let chapter_id:&str = x.get("chapter_id");
+                    let novel_id: &str = x.get("novel_id");
+                    let novel_link: &str = x.get("novel_link");
+                    let chapter_id: &str = x.get("chapter_id");
                     let precedent = true;
                     let novel = RoyalNovel {
                         novel_id: novel_id.to_string(),
                         novel_link: novel_link.to_string(),
                         chapter_id: chapter_id.to_string(),
-                        precedent
+                        precedent,
                     };
                     temp.push(novel);
                 }).for_each(drop);
                 return Ok(temp);
-            },
+            }
             Err(e) => Err(SimpleError::new(e.to_string()))
-        }
+        };
     }
     pub async fn update(&self, pool: &SqlitePool) -> Result<(), SimpleError> {
         let result = sqlx::query("\
@@ -232,7 +234,7 @@ impl RoyalNovel {
         return match result {
             Ok(_) => Ok(()),
             Err(e) => Err(SimpleError::new(e.to_string()))
-        }
+        };
     }
 }
 
@@ -240,7 +242,7 @@ pub struct RoyalMessage {
     pub novel_id: String,
     pub novel_link: String,
     pub chapter_id: Vec<String>,
-    pub channel_id: Option<Vec<ChannelId>>
+    pub channel_id: Option<Vec<ChannelId>>,
 }
 
 impl RoyalMessage {
@@ -249,7 +251,7 @@ impl RoyalMessage {
             novel_id,
             novel_link,
             chapter_id,
-            channel_id: None
+            channel_id: None,
         }
     }
     // pub fn set_channel_id(&mut self, channel_id: Option<Vec<ChannelId>>) {
@@ -262,15 +264,14 @@ impl RoyalMessage {
             .fetch_all(pool).await;
         return match result {
             Ok(t) => {
-
                 let z = t.into_iter().map(|x| {
                     let channel_id: &str = x.get("channel_id");
                     ChannelId::from(channel_id.parse::<u64>().unwrap())
                 }).collect::<Vec<ChannelId>>();
                 Some(z)
-            },
+            }
             Err(_) => None
-        }
+        };
     }
 }
 

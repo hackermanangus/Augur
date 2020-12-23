@@ -17,3 +17,8 @@ reqwest = "0.10.8"
 regex = "1.4.2"
 sqlx = { version = "0.4.2", features = ["runtime-tokio-native-tls", "sqlite"]}
 uuid = { version = "0.8", features = ["v4"] }
+twilight-permission-calculator = { branch = "trunk", default-features = false, git = "https://github.com/twilight-rs/permission-calculator" }
+
+[target.'cfg(linux)'.dependencies.openssl]
+version = "0.10"
+features = ["vendored"]

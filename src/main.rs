@@ -23,6 +23,7 @@ pub struct Bot {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
+
     dotenv::dotenv().ok();
     let token = env::var("TEST_TOKEN")?;
 

@@ -3,7 +3,7 @@ use sqlx::{Row, SqlitePool};
 use twilight_model::id::{ChannelId, GuildId};
 use uuid::Uuid;
 
-use crate::error::SimpleError;
+use crate::error::AugurError;
 
 // Order of operation is as following
 // First we create a new RoyalNovel struct with RoyalNovel::new(novel_link, pool)
@@ -29,7 +29,7 @@ impl RoyalGuild {
             novel_id: royal_novel.novel_id.clone(),
         }
     }
-    pub async fn insert(&self, pool: &SqlitePool) -> Result<(), SimpleError> {
+    pub async fn insert(&self, pool: &SqlitePool) -> Result<(), AugurError> {
         let mut conn = pool.acquire().await.unwrap();
         let result = sqlx::query("INSERT INTO Guilds (guild_id, channel_id, novel_id)
         VALUES (?, ?, ?)")
@@ -39,10 +39,10 @@ impl RoyalGuild {
             .execute(&mut conn).await;
         return match result {
             Ok(_) => Ok(()),
-            Err(e) => Err(SimpleError::new(e))
+            Err(_) => Err(AugurError::FailedQuery)
         };
     }
-    pub async fn remove(&self, pool: &SqlitePool) -> Result<(), SimpleError> {
+    pub async fn remove(&self, pool: &SqlitePool) -> Result<(), AugurError> {
         let mut conn = pool.acquire().await.unwrap();
         let result = sqlx::query("DELETE FROM Guilds WHERE novel_id = ? AND channel_id=?")
             .bind(&self.novel_id)
@@ -50,10 +50,10 @@ impl RoyalGuild {
             .execute(&mut conn).await;
         return match result {
             Ok(_) => { Ok(()) }
-            Err(_) => Err(SimpleError::new("Failed to remove novel. Please try again".to_string()))
+            Err(_) => Err(AugurError::FailedQuery)
         };
     }
-    pub async fn check(guild_id: Option<GuildId>, pool: &SqlitePool) -> Result<Vec<(String, String)>, SimpleError> {
+    pub async fn check(guild_id: Option<GuildId>, pool: &SqlitePool) -> Result<Vec<(String, String)>, AugurError> {
         let mut conn = pool.acquire().await.unwrap();
         let guild = guild_id.unwrap().to_string();
         let result = sqlx::query(
@@ -63,7 +63,7 @@ impl RoyalGuild {
             .await;
         return match result {
             Ok(this) => {
-                if this.is_empty() { return Err(SimpleError::new("This guild hasn't set up any novels".to_string())); }
+                if this.is_empty() { return Err(AugurError::NonExistentGuild); }
                 let mut temp: Vec<(String, String)> = Vec::new();
                 this.into_iter().map(|x| {
                     let y: String = x.get("novel_link");
@@ -73,8 +73,8 @@ impl RoyalGuild {
                 ).for_each(drop);
                 Ok(temp)
             }
-            Err(e) => {
-                Err(SimpleError::new(e.to_string()))
+            Err(_) => {
+                Err(AugurError::FailedQuery)
             }
         };
     }
@@ -88,10 +88,10 @@ pub struct RoyalNovel {
 }
 
 impl RoyalNovel {
-    pub async fn proc_new(novel_link: String, pool: &SqlitePool) -> Result<RoyalNovel, SimpleError> {
+    pub async fn proc_new(novel_link: String, pool: &SqlitePool) -> Result<RoyalNovel, AugurError> {
         let (novel_id, precedent) = Self::check(&novel_link, pool).await;
         if !precedent {
-            return Err(SimpleError::new("Novel doesn't exist in database".to_string()));
+            return Err(AugurError::NonExistentNovel);
         }
         Ok(RoyalNovel {
             novel_id,
@@ -100,7 +100,7 @@ impl RoyalNovel {
             precedent,
         })
     }
-    pub async fn new(novel_link: String, pool: &SqlitePool) -> Result<RoyalNovel, SimpleError> {
+    pub async fn new(novel_link: String, pool: &SqlitePool) -> Result<RoyalNovel, AugurError> {
         let (novel_id, precedent) = Self::check(&novel_link, pool).await;
         let chapter_id: String;
         if precedent {
@@ -118,7 +118,7 @@ impl RoyalNovel {
             precedent,
         })
     }
-    pub async fn process(&self, pool: &SqlitePool, guild: Option<GuildId>, channel: ChannelId) -> Result<RoyalGuild, SimpleError> {
+    pub async fn process(&self, pool: &SqlitePool, guild: Option<GuildId>, channel: ChannelId) -> Result<RoyalGuild, AugurError> {
         if !self.precedent {
             match self.insert(pool).await {
                 Ok(_) => {}
@@ -127,15 +127,15 @@ impl RoyalNovel {
         }
         Ok(RoyalGuild::new(guild, channel, self))
     }
-    pub async fn get_chapters(novel_link: &String) -> Result<String, SimpleError> {
+    pub async fn get_chapters(novel_link: &String) -> Result<String, AugurError> {
         let page = reqwest::get(novel_link).await;
         let page = match page {
             Ok(body) => match body.text().await {
                 Ok(text) => { text }
-                Err(e) => { return Err(SimpleError::new(e.to_string())); }
+                Err(_) => { return Err(AugurError::InvalidLink); }
             },
             Err(_) => {
-                return Err(SimpleError::new("Invalid novel link"));
+                return Err(AugurError::InvalidLink);
             }
         };
         // <td>.?<a[^<>]href=["'](?P<chapter_link>[^"']+)["'] regex flor made
@@ -155,7 +155,7 @@ impl RoyalNovel {
         return if truth {
             Ok(temp.trim().to_string())
         } else {
-            Err(SimpleError::new("No chapters found".to_string()))
+            Err(AugurError::NoChapters)
         };
     }
     pub async fn check(novel_link: &String, pool: &SqlitePool) -> (String, bool) {
@@ -171,7 +171,7 @@ impl RoyalNovel {
         };
 
     }
-    async fn insert(&self, pool: &SqlitePool) -> Result<(), SimpleError> {
+    async fn insert(&self, pool: &SqlitePool) -> Result<(), AugurError> {
         if !self.precedent {
             let mut conn = pool.acquire().await.unwrap();
             let result = sqlx::query("INSERT INTO Novels (novel_id, novel_link, chapter_id)
@@ -182,7 +182,7 @@ impl RoyalNovel {
                 .execute(&mut conn).await;
             return match result {
                 Ok(_) => Ok(()),
-                Err(e) => Err(SimpleError::new(e))
+                Err(_) => Err(AugurError::UniqueConstraint)
             };
         }
         Ok(())
@@ -202,7 +202,7 @@ impl RoyalNovel {
 
         return RoyalMessage::new(self.novel_id.clone(), self.novel_link.clone(), three);
     }
-    pub async fn retrieve_old(pool: &SqlitePool) -> Result<Vec<RoyalNovel>, SimpleError> {
+    pub async fn retrieve_old(pool: &SqlitePool) -> Result<Vec<RoyalNovel>, AugurError> {
         let result = sqlx::query("\
         SELECT novel_id, novel_link, chapter_id FROM Novels").fetch_all(pool).await;
 
@@ -224,16 +224,16 @@ impl RoyalNovel {
                 }).for_each(drop);
                 return Ok(temp);
             }
-            Err(e) => Err(SimpleError::new(e.to_string()))
+            Err(_) => Err(AugurError::FailedQuery)
         };
     }
-    pub async fn update(&self, pool: &SqlitePool) -> Result<(), SimpleError> {
+    pub async fn update(&self, pool: &SqlitePool) -> Result<(), AugurError> {
         let result = sqlx::query("\
         UPDATE Novels SET chapter_id = ? WHERE novel_id = ?").bind(&self.chapter_id).bind(&self.novel_id)
             .execute(pool).await;
         return match result {
             Ok(_) => Ok(()),
-            Err(e) => Err(SimpleError::new(e.to_string()))
+            Err(_) => Err(AugurError::FailedQuery)
         };
     }
 }

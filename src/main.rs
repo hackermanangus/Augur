@@ -24,7 +24,7 @@ pub struct Bot {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     dotenv::dotenv().ok();
-    let token = env::var("DISCORD_TOKEN")?;
+    let token = env::var("TEST_TOKEN")?;
 
     // This is the default scheme. It will automatically create as many
     // shards as is suggested by Discord.

@@ -23,7 +23,6 @@ pub struct Bot {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
-
     dotenv::dotenv().ok();
     let token = env::var("TEST_TOKEN")?;
 
@@ -54,17 +53,6 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         pool,
     });
 
-    // yes
-
-    // let novel = RoyalNovel {
-    //     novel_id: "test".to_string(),
-    //     novel_link: "fuck".to_string(),
-    //     chapter_id: "tes".to_string(),
-    //     precedent: false
-    // };
-
-    //novel.insert(&bot.pool).await?;
-    //println!("{}", novel.check(&bot.pool).await.unwrap().to_string());
 
     // Since we only care about new messages, make the cache only
     // cache new messages.
@@ -122,32 +110,6 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
                     }
                 }
             }
-
-
-            //     let new_novel = novels.into_iter().map(|novel| {
-            //         let new_novel = RoyalNovel {
-            //             novel_id: novel.novel_id.clone(),
-            //             novel_link: novel.novel_link.clone(),
-            //             chapter_id,
-            //             precedent: true
-            //         };
-            //         messages.push(novel.compare(&new_novel));
-            //         new_novel
-            //     }).collect::<Vec<RoyalNovel>>();
-            //     for n in new_novel.into_iter() { n.update(&bot.pool).await};
-            //     messages.into_iter().map(|mut message| {
-            //         message.set_channel_id(RoyalMessage::retrieve_channel_groups(message.novel_id.clone(), &bot.pool).await);
-            //         if message.channel_id.is_some() {
-            //             let mut links = String::new();
-            //             message.chapter_id.into_iter().map(|link| {
-            //                 links.push_str(format!("https://royalroad.com{} \n", link).as_str());
-            //             });
-            //             message.channel_id.unwrap().into_iter().map(|channel| {
-            //                 &bot.http.create_message(channel).content(links)?.await?;
-            //                 tokio::time::delay_for(Duration::from_secs(1)).await;
-            //             }).collect::<Option<T>>();
-            //         }
-            //     });
         }
     });
     // Process each event as they come in.

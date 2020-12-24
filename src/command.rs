@@ -10,10 +10,11 @@ use crate::error::AugurError;
 use twilight_embed_builder::EmbedBuilder;
 
 pub async fn handle(msg: Box<MessageCreate>, bot: Arc<Bot>) -> Result<(), Box<dyn Error + Send + Sync>> {
-    if msg.guild_id.is_none() {
+
+    let args: Vec<&str> = msg.content.as_str().split_whitespace().collect();
+    if msg.guild_id.is_none() | args.is_empty() {
         return Ok(());
     }
-    let args: Vec<&str> = msg.content.as_str().split_whitespace().collect();
     match args[0] {
         ">royalroad" => {
             let member = &bot.http.guild_member(msg.guild_id.unwrap(), msg.author.id).await?.ok_or(AugurError::FailedDiscordRequest)?;

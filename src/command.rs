@@ -31,7 +31,7 @@ pub async fn handle(msg: Box<MessageCreate>, bot: Arc<Bot>) -> Result<(), Box<dy
                     if is_admin { break }
                 }
                 if is_admin {
-                    royalroad::commands::handle(msg.clone(), bot, args).await?
+                    royalroad::handle(msg.clone(), bot, args).await?
                 } else {
                     &bot.http.create_message(msg.channel_id).content("Administrator permissions are needed")?.await?;
                 }

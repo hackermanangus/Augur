@@ -37,7 +37,7 @@ pub async fn handle(msg: Box<MessageCreate>, bot: Arc<Bot>) -> Result<(), Box<dy
                 }
             }
             _ if msg.content.starts_with("!ping") => {
-                bot.http.create_message(msg.channel_id).content("Pong!")?.await?;
+                &bot.http.create_message(msg.channel_id).content("Pong!")?.await?;
             }
             _ => {}
         }

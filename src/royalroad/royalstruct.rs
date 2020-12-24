@@ -39,7 +39,7 @@ impl RoyalGuild {
             .execute(&mut conn).await;
         return match result {
             Ok(_) => Ok(()),
-            Err(_) => Err(AugurError::FailedQuery)
+            Err(_) => Err(AugurError::UniqueConstraint)
         };
     }
     pub async fn remove(&self, pool: &SqlitePool) -> Result<(), AugurError> {

@@ -18,13 +18,13 @@ pub enum AugurError {
 impl Display for AugurError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self {
-            AugurError::NonExistentNovel => { write!(f, "{}, Novel not found", self)}
-            AugurError::NonExistentGuild => { write!(f, "{}, No novels setup in Guild", self)}
-            AugurError::UniqueConstraint => { write!(f, "{}, Novel has already been setup in this channel", self)}
-            AugurError::NoChapters => { write!(f, "{}, No chapters found for provided novel", self)}
-            AugurError::InvalidLink => { write!(f, "{}, Provided novel link is invalid", self)}
-            AugurError::FailedQuery => { write!(f, "{}, Something went wrong while querying the database", self)}
-            AugurError::FailedDiscordRequest => { write!(f, "{}, Request to Discord API failed", self)}
+            AugurError::NonExistentNovel => { write!(f, "`{:?}`: Novel not found", self)}
+            AugurError::NonExistentGuild => { write!(f, "`{:?}`: No novels setup in Guild", self)}
+            AugurError::UniqueConstraint => { write!(f, "`{:?}`: Novel has already been setup in this channel", self)}
+            AugurError::NoChapters => { write!(f, "`{:?}`: No chapters found for provided novel", self)}
+            AugurError::InvalidLink => { write!(f, "`{:?}`: Provided novel link is invalid", self)}
+            AugurError::FailedQuery => { write!(f, "`{:?}`: Something went wrong while querying the database", self)}
+            AugurError::FailedDiscordRequest => { write!(f, "`{:?}`: Request to Discord API failed", self)}
         }
     }
 }

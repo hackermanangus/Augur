@@ -60,14 +60,11 @@ impl RoyalGuild {
         return match result {
             Ok(this) => {
                 if this.is_empty() { return Err(AugurError::NonExistentGuild); }
-                let mut temp: Vec<(String, String)> = Vec::new();
-                this.into_iter().map(|x| {
+                Ok(this.into_iter().map(|x| {
                     let y: String = x.get("novel_link");
                     let z: String = x.get("channel_id");
-                    temp.push((z, y));
-                }
-                ).for_each(drop);
-                Ok(temp)
+                    (z, y)
+                }).collect::<Vec<(String, String)>>())
             }
             Err(_) => {
                 Err(AugurError::FailedQuery)
@@ -126,15 +123,11 @@ impl RoyalNovel {
     pub async fn get_chapters(novel_link: &String) -> Result<String, AugurError> {
         let page = reqwest::get(novel_link).await;
         let page = page.or(Err(AugurError::InvalidLink))?.text().await.or(Err(AugurError::InvalidLink))?;
-        // <td>.?<a[^<>]href=["'](?P<chapter_link>[^"']+)["'] regex flor made
-        // <meta name="description" content="(?P<description>[^">])["][>] regex I made big brain
-        // /chapter/(?P<chapter_id>[0-9])/ another regex I wrote to get the id
+
         // <td>\s*<a\s*href=["'](?P<chapter_link>[^"']+)["']> this works, something with the old regex broke?
         let re = Regex::new(r#"(?sm)<td>\s*<a\s*href=["'](?P<chapter_link>[^"']+)["']>"#).unwrap();
-        //let re_c_id = Regex::new(r#"/chapter/(?P<chapter_id>[0-9]*)/"#).unwrap();
         let mut temp: String = String::new();
         for capture in re.captures_iter(&page) {
-            //let one = re_c_id.captures(&capture["chapter_link"]);
             temp.push_str(&capture["chapter_link"]);
             temp.push_str(" ");
         }
@@ -144,6 +137,7 @@ impl RoyalNovel {
         let row = sqlx::query("SELECT * FROM Novels WHERE novel_link = ?")
             .bind(novel_link)
             .fetch_one(pool).await;
+
         return match row {
             Ok(row) => {
                 let novel_id: &str = row.get("novel_id");
@@ -170,8 +164,6 @@ impl RoyalNovel {
         let one = self.chapter_id.split_whitespace().collect::<Vec<&str>>().into_iter().map(|x| x.to_string()).collect::<Vec<String>>();
         let two = updated.chapter_id.split_whitespace().collect::<Vec<&str>>().into_iter().map(|x| x.to_string()).collect::<Vec<String>>();
 
-        //let mut three: Vec<String> = Vec::new();
-        //let three = two.into_iter().filter_map(|x| if one.contains(&x) { Some(x) } else { None}).collect::<Vec<String>>();
         let three = two.into_iter()
             .filter_map(|x| if !one.contains(&x) {
                 Some(x)

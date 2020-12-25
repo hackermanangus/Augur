@@ -1,19 +1,19 @@
-pub mod royalstruct;
-mod remove;
-mod check;
-mod add;
-
 use std::error::Error;
 use std::sync::Arc;
 
+use chrono::{SecondsFormat, Utc};
+use twilight_embed_builder::{EmbedBuilder, EmbedFieldBuilder};
 use twilight_model::gateway::payload::MessageCreate;
 
 use crate::Bot;
 use crate::royalroad::add::add;
-use crate::royalroad::remove::remove;
 use crate::royalroad::check::check;
-use twilight_embed_builder::{EmbedBuilder, EmbedFieldBuilder};
-use chrono::{Utc, SecondsFormat};
+use crate::royalroad::remove::remove;
+
+pub mod royalstruct;
+mod remove;
+mod check;
+mod add;
 
 pub async fn handle(msg: Box<MessageCreate>, bot: Arc<Bot>, args: Vec<&str>) -> Result<(), Box<dyn Error + Send + Sync>> {
     let embed = EmbedBuilder::new()
@@ -23,7 +23,7 @@ pub async fn handle(msg: Box<MessageCreate>, bot: Arc<Bot>, args: Vec<&str>) -> 
 
     match args[1] {
         "add" => {
-            if args.len() <3 {
+            if args.len() < 3 {
                 let embed = embed.description("`EmptyArgument`: No provided arguments")?.field(EmbedFieldBuilder::new("Usage", ">royalroad add <link>")?).build()?;
                 &bot.http.create_message(msg.channel_id).embed(embed)?.await?;
             } else {

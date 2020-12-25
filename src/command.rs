@@ -7,10 +7,9 @@ use twilight_permission_calculator::prelude::Permissions;
 
 use crate::{Bot, royalroad};
 use crate::error::AugurError;
-use twilight_embed_builder::EmbedBuilder;
+use crate::update::start_update;
 
 pub async fn handle(msg: Box<MessageCreate>, bot: Arc<Bot>) -> Result<(), Box<dyn Error + Send + Sync>> {
-
     let args: Vec<&str> = msg.content.as_str().split_whitespace().collect();
     if msg.guild_id.is_none() | args.is_empty() {
         return Ok(());
@@ -41,7 +40,10 @@ pub async fn handle(msg: Box<MessageCreate>, bot: Arc<Bot>) -> Result<(), Box<dy
         }
         ">help" => {
             &bot.http.create_message(msg.channel_id).content("```>royalroad add <link>\n>royalroad check\n>royalroad remove <link>```")?.await?;
-
+        }
+        ">force-update" => {
+            println!("Executed");
+            start_update(bot).await?;
         }
         _ => {}
     }

@@ -10,11 +10,13 @@ use twilight_http::Client as HttpClient;
 use twilight_model::gateway::Intents;
 
 use crate::royalroad::royalstruct::{RoyalMessage, RoyalNovel};
+use crate::update::start_update;
 
 mod db;
 mod command;
 mod royalroad;
 mod error;
+pub mod update;
 
 pub struct Bot {
     pub http: HttpClient,
@@ -67,48 +69,10 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     tokio::spawn(async move {
         loop {
             tokio::time::delay_for(Duration::from_secs(600)).await;
-            println!("launching");
-            let novels = match RoyalNovel::retrieve_old(&bot.pool).await {
-                Ok(t) => t,
-                Err(e) => {
-                    println!("{}", e.to_string());
-                    break;
-                }
-            };
-            for novel in novels.into_iter() {
-                let chapter_id = match RoyalNovel::get_chapters(&novel.novel_link.clone()).await {
-                    Ok(t) => t,
-                    Err(e) => {
-                        println!("{}", e.to_string());
-                        "".to_string()
-                    }
-                };
-                let new_novel = RoyalNovel {
-                    novel_id: novel.novel_id.clone(),
-                    novel_link: novel.novel_link.clone(),
-                    chapter_id,
-                    precedent: true,
-                };
-                let _ = new_novel.update(&bot.pool).await;
-                let message = novel.compare(&new_novel);
-                let channels = RoyalMessage::retrieve_channel_groups(novel.novel_id.clone(), &bot.pool).await;
-                if channels.is_none() {
-                    break;
-                } else {
-                    let vec_channel = channels.unwrap();
-
-                    println!("->{:?}", &vec_channel);
-                    for channel in vec_channel.into_iter() {
-                        message.chapter_id.as_slice().chunks(5);
-                        for slice in message.chapter_id.chunks(5) {
-                            let compounded_msg = slice.iter().map(|x| {
-                                //println!("{}", &x);
-                                format!("https://royalroad.com{}\n", x)
-                            }).collect::<String>();
-                            &bot.http.create_message(channel).content(&compounded_msg).unwrap().await;
-                        }
-                    }
-                }
+            let n = start_update(bot.clone()).await;
+            match n {
+                Ok(_) => "",
+                Err(e) => println!("{:?}", e)
             }
         }
     });

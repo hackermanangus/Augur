@@ -1,5 +1,5 @@
 use regex::Regex;
-use sqlx::{Row, SqlitePool, Error};
+use sqlx::{Error, Row, SqlitePool};
 use twilight_model::id::{ChannelId, GuildId};
 use uuid::Uuid;
 
@@ -83,9 +83,7 @@ pub struct RoyalNovel {
 impl RoyalNovel {
     pub async fn proc_new(novel_link: String, pool: &SqlitePool) -> Result<RoyalNovel, AugurError> {
         let (novel_id, precedent) = Self::check(&novel_link, pool).await;
-        if !precedent {
-            return Err(AugurError::NonExistentNovel);
-        }
+        if !precedent { return Err(AugurError::NonExistentNovel); }
         Ok(RoyalNovel {
             novel_id,
             novel_link,
@@ -131,7 +129,8 @@ impl RoyalNovel {
             temp.push_str(&capture["chapter_link"]);
             temp.push_str(" ");
         }
-        if temp.is_empty() { return Err(AugurError::NoChapters)} Ok(temp)
+        if temp.is_empty() { return Err(AugurError::NoChapters); }
+        Ok(temp)
     }
     pub async fn check(novel_link: &String, pool: &SqlitePool) -> (String, bool) {
         let row = sqlx::query("SELECT * FROM Novels WHERE novel_link = ?")
@@ -145,7 +144,6 @@ impl RoyalNovel {
             }
             _ => { (Uuid::new_v4().to_string(), false) }
         };
-
     }
     async fn insert(&self, pool: &SqlitePool) -> Result<(), AugurError> {
         if !self.precedent {
@@ -178,18 +176,19 @@ impl RoyalNovel {
         SELECT novel_id, novel_link, chapter_id FROM Novels").fetch_all(pool).await;
 
         return match result {
-            Ok(k) => {Ok(
-                k.into_iter().map(|x| {
-                    let novel_id: &str = x.get("novel_id");
-                    let novel_link: &str = x.get("novel_link");
-                    let chapter_id: &str = x.get("chapter_id");
-                    RoyalNovel {
-                        novel_id: novel_id.to_string(),
-                        novel_link: novel_link.to_string(),
-                        chapter_id: chapter_id.to_string(),
-                        precedent: true,
-                    }
-                }).collect::<Vec<RoyalNovel>>())
+            Ok(k) => {
+                Ok(
+                    k.into_iter().map(|x| {
+                        let novel_id: &str = x.get("novel_id");
+                        let novel_link: &str = x.get("novel_link");
+                        let chapter_id: &str = x.get("chapter_id");
+                        RoyalNovel {
+                            novel_id: novel_id.to_string(),
+                            novel_link: novel_link.to_string(),
+                            chapter_id: chapter_id.to_string(),
+                            precedent: true,
+                        }
+                    }).collect::<Vec<RoyalNovel>>())
             }
             Err(_) => Err(AugurError::FailedQuery)
         };
@@ -228,10 +227,10 @@ impl RoyalMessage {
         return match result {
             Ok(t) => {
                 Some(
-                t.into_iter().map(|x| {
-                    let channel_id: &str = x.get("channel_id");
-                    ChannelId::from(channel_id.parse::<u64>().unwrap())
-                }).collect::<Vec<ChannelId>>())
+                    t.into_iter().map(|x| {
+                        let channel_id: &str = x.get("channel_id");
+                        ChannelId::from(channel_id.parse::<u64>().unwrap())
+                    }).collect::<Vec<ChannelId>>())
             }
             Err(_) => None
         };

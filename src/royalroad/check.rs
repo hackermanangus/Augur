@@ -1,8 +1,10 @@
-use crate::error::PendingMessage;
 use std::error::Error;
-use crate::Bot;
 use std::sync::Arc;
+
 use twilight_model::gateway::payload::MessageCreate;
+
+use crate::Bot;
+use crate::error::PendingMessage;
 use crate::royalroad::royalstruct::RoyalGuild;
 
 pub async fn check(msg: Box<MessageCreate>, bot: Arc<Bot>) -> Result<PendingMessage, Box<dyn Error + Send + Sync>> {

@@ -1,9 +1,11 @@
-use crate::error::PendingMessage;
 use std::error::Error;
-use twilight_model::gateway::payload::MessageCreate;
 use std::sync::Arc;
+
+use twilight_model::gateway::payload::MessageCreate;
+
 use crate::Bot;
-use crate::royalroad::royalstruct::{RoyalNovel, RoyalGuild};
+use crate::error::PendingMessage;
+use crate::royalroad::royalstruct::{RoyalGuild, RoyalNovel};
 
 pub async fn remove(msg: Box<MessageCreate>, bot: Arc<Bot>, args: Vec<&str>) -> Result<PendingMessage, Box<dyn Error + Send + Sync>> {
     let novel = match RoyalNovel::proc_new(args[2].to_string(), &bot.pool).await {

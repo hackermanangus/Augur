@@ -1,5 +1,5 @@
 use regex::Regex;
-use sqlx::{Row, SqlitePool};
+use sqlx::{Error, Row, SqlitePool};
 use twilight_model::id::{ChannelId, GuildId};
 use uuid::Uuid;
 
@@ -31,27 +31,23 @@ impl RoyalGuild {
     }
     pub async fn insert(&self, pool: &SqlitePool) -> Result<(), AugurError> {
         let mut conn = pool.acquire().await.unwrap();
-        let result = sqlx::query("INSERT INTO Guilds (guild_id, channel_id, novel_id)
+        let result: Result<_, Error> = sqlx::query("INSERT INTO Guilds (guild_id, channel_id, novel_id)
         VALUES (?, ?, ?)")
             .bind(&self.guild_id)
             .bind(&self.channel_id)
             .bind(&self.novel_id)
             .execute(&mut conn).await;
-        return match result {
-            Ok(_) => Ok(()),
-            Err(_) => Err(AugurError::UniqueConstraint)
-        };
+        result.or(Err(AugurError::UniqueConstraint))?;
+        Ok(())
     }
     pub async fn remove(&self, pool: &SqlitePool) -> Result<(), AugurError> {
         let mut conn = pool.acquire().await.unwrap();
-        let result = sqlx::query("DELETE FROM Guilds WHERE novel_id = ? AND channel_id=?")
+        let result: Result<_, Error> = sqlx::query("DELETE FROM Guilds WHERE novel_id = ? AND channel_id=?")
             .bind(&self.novel_id)
             .bind(&self.channel_id)
             .execute(&mut conn).await;
-        return match result {
-            Ok(_) => { Ok(()) }
-            Err(_) => Err(AugurError::FailedQuery)
-        };
+        result.or(Err(AugurError::FailedQuery))?;
+        Ok(())
     }
     pub async fn check(guild_id: Option<GuildId>, pool: &SqlitePool) -> Result<Vec<(String, String)>, AugurError> {
         let mut conn = pool.acquire().await.unwrap();
@@ -64,14 +60,11 @@ impl RoyalGuild {
         return match result {
             Ok(this) => {
                 if this.is_empty() { return Err(AugurError::NonExistentGuild); }
-                let mut temp: Vec<(String, String)> = Vec::new();
-                this.into_iter().map(|x| {
+                Ok(this.into_iter().map(|x| {
                     let y: String = x.get("novel_link");
                     let z: String = x.get("channel_id");
-                    temp.push((z, y));
-                }
-                ).for_each(drop);
-                Ok(temp)
+                    (z, y)
+                }).collect::<Vec<(String, String)>>())
             }
             Err(_) => {
                 Err(AugurError::FailedQuery)
@@ -90,9 +83,7 @@ pub struct RoyalNovel {
 impl RoyalNovel {
     pub async fn proc_new(novel_link: String, pool: &SqlitePool) -> Result<RoyalNovel, AugurError> {
         let (novel_id, precedent) = Self::check(&novel_link, pool).await;
-        if !precedent {
-            return Err(AugurError::NonExistentNovel);
-        }
+        if !precedent { return Err(AugurError::NonExistentNovel); }
         Ok(RoyalNovel {
             novel_id,
             novel_link,
@@ -129,39 +120,23 @@ impl RoyalNovel {
     }
     pub async fn get_chapters(novel_link: &String) -> Result<String, AugurError> {
         let page = reqwest::get(novel_link).await;
-        let page = match page {
-            Ok(body) => match body.text().await {
-                Ok(text) => { text }
-                Err(_) => { return Err(AugurError::InvalidLink); }
-            },
-            Err(_) => {
-                return Err(AugurError::InvalidLink);
-            }
-        };
-        // <td>.?<a[^<>]href=["'](?P<chapter_link>[^"']+)["'] regex flor made
-        // <meta name="description" content="(?P<description>[^">])["][>] regex I made big brain
-        // /chapter/(?P<chapter_id>[0-9])/ another regex I wrote to get the id
+        let page = page.or(Err(AugurError::InvalidLink))?.text().await.or(Err(AugurError::InvalidLink))?;
+
         // <td>\s*<a\s*href=["'](?P<chapter_link>[^"']+)["']> this works, something with the old regex broke?
         let re = Regex::new(r#"(?sm)<td>\s*<a\s*href=["'](?P<chapter_link>[^"']+)["']>"#).unwrap();
-        //let re_c_id = Regex::new(r#"/chapter/(?P<chapter_id>[0-9]*)/"#).unwrap();
-        let truth: bool = true;
         let mut temp: String = String::new();
-        for capture in re.captures_iter(&page)
-        {
-            //let one = re_c_id.captures(&capture["chapter_link"]);
+        for capture in re.captures_iter(&page) {
             temp.push_str(&capture["chapter_link"]);
             temp.push_str(" ");
         }
-        return if truth {
-            Ok(temp.trim().to_string())
-        } else {
-            Err(AugurError::NoChapters)
-        };
+        if temp.is_empty() { return Err(AugurError::NoChapters); }
+        Ok(temp)
     }
     pub async fn check(novel_link: &String, pool: &SqlitePool) -> (String, bool) {
         let row = sqlx::query("SELECT * FROM Novels WHERE novel_link = ?")
             .bind(novel_link)
             .fetch_one(pool).await;
+
         return match row {
             Ok(row) => {
                 let novel_id: &str = row.get("novel_id");
@@ -169,21 +144,17 @@ impl RoyalNovel {
             }
             _ => { (Uuid::new_v4().to_string(), false) }
         };
-
     }
     async fn insert(&self, pool: &SqlitePool) -> Result<(), AugurError> {
         if !self.precedent {
             let mut conn = pool.acquire().await.unwrap();
-            let result = sqlx::query("INSERT INTO Novels (novel_id, novel_link, chapter_id)
+            let result: Result<_, Error> = sqlx::query("INSERT INTO Novels (novel_id, novel_link, chapter_id)
         VALUES (?, ?, ?)")
                 .bind(&self.novel_id)
                 .bind(&self.novel_link)
                 .bind(&self.chapter_id)
                 .execute(&mut conn).await;
-            return match result {
-                Ok(_) => Ok(()),
-                Err(_) => Err(AugurError::UniqueConstraint)
-            };
+            result.or(Err(AugurError::UniqueConstraint))?;
         }
         Ok(())
     }
@@ -191,8 +162,6 @@ impl RoyalNovel {
         let one = self.chapter_id.split_whitespace().collect::<Vec<&str>>().into_iter().map(|x| x.to_string()).collect::<Vec<String>>();
         let two = updated.chapter_id.split_whitespace().collect::<Vec<&str>>().into_iter().map(|x| x.to_string()).collect::<Vec<String>>();
 
-        //let mut three: Vec<String> = Vec::new();
-        //let three = two.into_iter().filter_map(|x| if one.contains(&x) { Some(x) } else { None}).collect::<Vec<String>>();
         let three = two.into_iter()
             .filter_map(|x| if !one.contains(&x) {
                 Some(x)
@@ -208,33 +177,28 @@ impl RoyalNovel {
 
         return match result {
             Ok(k) => {
-                let mut temp: Vec<RoyalNovel> = Vec::new();
-                k.into_iter().map(|x| {
-                    let novel_id: &str = x.get("novel_id");
-                    let novel_link: &str = x.get("novel_link");
-                    let chapter_id: &str = x.get("chapter_id");
-                    let precedent = true;
-                    let novel = RoyalNovel {
-                        novel_id: novel_id.to_string(),
-                        novel_link: novel_link.to_string(),
-                        chapter_id: chapter_id.to_string(),
-                        precedent,
-                    };
-                    temp.push(novel);
-                }).for_each(drop);
-                return Ok(temp);
+                Ok(
+                    k.into_iter().map(|x| {
+                        let novel_id: &str = x.get("novel_id");
+                        let novel_link: &str = x.get("novel_link");
+                        let chapter_id: &str = x.get("chapter_id");
+                        RoyalNovel {
+                            novel_id: novel_id.to_string(),
+                            novel_link: novel_link.to_string(),
+                            chapter_id: chapter_id.to_string(),
+                            precedent: true,
+                        }
+                    }).collect::<Vec<RoyalNovel>>())
             }
             Err(_) => Err(AugurError::FailedQuery)
         };
     }
     pub async fn update(&self, pool: &SqlitePool) -> Result<(), AugurError> {
-        let result = sqlx::query("\
+        let result: Result<_, Error> = sqlx::query("\
         UPDATE Novels SET chapter_id = ? WHERE novel_id = ?").bind(&self.chapter_id).bind(&self.novel_id)
             .execute(pool).await;
-        return match result {
-            Ok(_) => Ok(()),
-            Err(_) => Err(AugurError::FailedQuery)
-        };
+        result.or(Err(AugurError::FailedQuery))?;
+        Ok(())
     }
 }
 
@@ -254,9 +218,7 @@ impl RoyalMessage {
             channel_id: None,
         }
     }
-    // pub fn set_channel_id(&mut self, channel_id: Option<Vec<ChannelId>>) {
-    //     self.channel_id = channel_id;
-    // }
+
     pub async fn retrieve_channel_groups(novel_id: String, pool: &SqlitePool) -> Option<Vec<ChannelId>> {
         let result = sqlx::query("\
         SELECT channel_id FROM Guilds WHERE novel_id = ?")
@@ -264,11 +226,11 @@ impl RoyalMessage {
             .fetch_all(pool).await;
         return match result {
             Ok(t) => {
-                let z = t.into_iter().map(|x| {
-                    let channel_id: &str = x.get("channel_id");
-                    ChannelId::from(channel_id.parse::<u64>().unwrap())
-                }).collect::<Vec<ChannelId>>();
-                Some(z)
+                Some(
+                    t.into_iter().map(|x| {
+                        let channel_id: &str = x.get("channel_id");
+                        ChannelId::from(channel_id.parse::<u64>().unwrap())
+                    }).collect::<Vec<ChannelId>>())
             }
             Err(_) => None
         };

@@ -9,8 +9,8 @@ use twilight_gateway::{cluster::{Cluster, ShardScheme}, Event};
 use twilight_http::Client as HttpClient;
 use twilight_model::gateway::Intents;
 
-use crate::royalroad::royalstruct::{RoyalMessage, RoyalNovel};
 use crate::update::start_update;
+use twilight_model::id::UserId;
 
 mod db;
 mod command;
@@ -21,12 +21,14 @@ pub mod update;
 pub struct Bot {
     pub http: HttpClient,
     pub pool: SqlitePool,
+    pub owner: UserId
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     dotenv::dotenv().ok();
     let token = env::var("TEST_TOKEN")?;
+    let owner = UserId(env::var("OWNER")?.parse().unwrap());
 
     // This is the default scheme. It will automatically create as many
     // shards as is suggested by Discord.
@@ -53,6 +55,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let bot = Arc::new(Bot {
         http,
         pool,
+        owner
     });
 
 
@@ -71,8 +74,8 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             tokio::time::delay_for(Duration::from_secs(600)).await;
             let n = start_update(bot.clone()).await;
             match n {
-                Ok(_) => "",
-                Err(e) => println!("{:?}", e)
+                Ok(_) => continue,
+                Err(e) => {println!("{:?}", e); continue}
             }
         }
     });

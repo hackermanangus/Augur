@@ -42,8 +42,10 @@ pub async fn handle(msg: Box<MessageCreate>, bot: Arc<Bot>) -> Result<(), Box<dy
             &bot.http.create_message(msg.channel_id).content("```>royalroad add <link>\n>royalroad check\n>royalroad remove <link>```")?.await?;
         }
         ">force-update" => {
-            println!("Executed");
-            start_update(bot).await?;
+            if msg.author.id == bot.owner {
+                println!("Executed");
+                start_update(bot).await?;
+            }
         }
         _ => {}
     }
